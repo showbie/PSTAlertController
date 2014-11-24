@@ -54,16 +54,62 @@
 @property (nonatomic, copy) void (^viewDidDisappearBlock)(void);
 @end
 
-@implementation PSTExtendedAlertController
+// NOTE: the changes below to disable/enabled the UIDimmingView fixes an iOS 8 bug bug with the popoverModalPresentationStyle
+// where multiple taps to dismiss the popover (in the chrome area), makes multiple calls to "dismissViewController..."
+// which then dismisses the Pen tool, or other presented view controllers when in fact you only want the popover to go away
+@implementation PSTExtendedAlertController {
+    BOOL _shouldReEnableDimmingViewUserInteraction;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    
+    if (_shouldReEnableDimmingViewUserInteraction) {
+        // find the transition view
+        UIView *transitionView = [self superviewOfView:self.view withClassNamed:@"UITransitionView"];
+        
+        // re-enable user interaction on the dimming view
+        for (UIView *subview in transitionView.subviews) {
+            if ([subview isMemberOfClass:NSClassFromString(@"UIDimmingView")]) {
+                subview.userInteractionEnabled = YES;
+            }
+        }
+        
+        _shouldReEnableDimmingViewUserInteraction = NO;
+    }
+}
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    
+    // find the transition view
+    UIView *transitionView = [self superviewOfView:self.view withClassNamed:@"UITransitionView"];
+    
+    // disable user interaction on the dimming view
+    for (UIView *subview in transitionView.subviews) {
+        if ([subview isMemberOfClass:NSClassFromString(@"UIDimmingView")]) {
+            subview.userInteractionEnabled = NO;
+        }
+    }
+    
+    _shouldReEnableDimmingViewUserInteraction = YES;
+
     if (self.viewWillDisappearBlock) self.viewWillDisappearBlock();
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
     if (self.viewDidDisappearBlock) self.viewDidDisappearBlock();
+}
+
+- (UIView *)superviewOfView:(UIView *)view withClassNamed:(NSString *)className {
+    UIView *matchingView = view.superview;
+    
+    while (matchingView && ![matchingView isMemberOfClass:NSClassFromString(className)]) {
+        matchingView = matchingView.superview;
+    }
+    
+    return matchingView;
 }
 
 @end
